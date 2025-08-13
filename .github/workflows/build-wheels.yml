@@ -1,38 +1,96 @@
-# .github/workflows/build-wheels.yml
-name: build-wheels
+# .github/workflows/build-cyclonedds-wheels.yml
+name: build-cyclonedds-wheels
 on:
   push:
   pull_request:
   workflow_dispatch:
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}-${{ github.run_attempt }}
+  cancel-in-progress: true
+
 jobs:
   build:
-    strategy:
-      matrix:
-        os: [ubuntu-22.04, macos-13]
     runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # Linux (manylinux)
+          - os: ubuntu-22.04
+            platform: linux
+            arch: x86_64
+            cibw_build: cp312-manylinux_x86_64
+          - os: ubuntu-22.04
+            platform: linux
+            arch: aarch64
+            cibw_build: cp312-manylinux_aarch64
+            qemu: true
+          # macOS (separate runners per arch)
+          - os: macos-13
+            platform: macos
+            arch: x86_64
+            cibw_build: cp312-macosx_x86_64
+          - os: macos-14
+            platform: macos
+            arch: arm64
+            cibw_build: cp312-macosx_arm64
+
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout (with submodules)
+        uses: actions/checkout@v4
         with:
           submodules: recursive
-      - uses: actions/setup-python@v5
+
+      - name: Enable QEMU for aarch64 (Linux)
+        if: matrix.platform == 'linux' && matrix.arch == 'aarch64'
+        uses: docker/setup-qemu-action@v3
+        with:
+          platforms: arm64
+
+      - name: macOS build deps
+        if: matrix.platform == 'macos'
+        run: |
+          brew update
+          brew install cmake ninja
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
         with:
           python-version: '3.12'
 
       - name: Install cibuildwheel
-        run: python -m pip install cibuildwheel
+        run: python -m pip install --upgrade pip cibuildwheel
 
-      - name: Build wheels
+      - name: Build wheel
         env:
-          CIBW_BUILD: "cp312-*"
-          CIBW_SKIP: "musllinux_*"   # tweak as needed
-          CIBW_ARCHS_MACOS: "x86_64 arm64"
-          CIBW_ARCHS_LINUX: "x86_64"
+          # Build exactly one wheel per job
+          CIBW_BUILD: ${{ matrix.cibw_build }}
+          CIBW_SKIP: "musllinux_*"
+
+          # Linux container pre-reqs (runs inside manylinux image)
+          CIBW_BEFORE_ALL_LINUX: "yum -y install cmake ninja-build openssl-devel || dnf -y install cmake ninja-build openssl-devel"
+
+          # (Optional) speed up native cmake builds
+          CMAKE_BUILD_PARALLEL_LEVEL: "4"
         run: python -m cibuildwheel --output-dir wheelhouse
 
-      - name: Upload wheels (artifact)
+      - name: Locate built wheel
+        shell: bash
+        run: |
+          set -euo pipefail
+          WHEEL_PATH=$(ls -1 wheelhouse/*.whl | head -n 1)
+          echo "WHEEL_PATH=$WHEEL_PATH" >> $GITHUB_ENV
+          echo "WHEEL_NAME=$(basename "$WHEEL_PATH")" >> $GITHUB_ENV
+          echo "Found $WHEEL_PATH"
+
+      - name: Upload wheel as its own artifact
         uses: actions/upload-artifact@v4
         with:
-          name: wheels
-          path: wheelhouse/*.whl
+          # Use the wheel filename so each artifact is unique and descriptive.
+          # Append run_attempt to avoid 409 on re-runs.
+          name: ${{ env.WHEEL_NAME }}-${{ github.run_attempt }}
+          path: ${{ env.WHEEL_PATH }}
+          if-no-files-found: error
+          compression-level: 0
 
