@@ -38,6 +38,10 @@ jobs:
             arch: arm64
             cibw_build: cp312-macosx_arm64
 
+    env:
+      # Change if you need a different CycloneDDS core version
+      CYCLONEDDS_CORE_TAG: v0.10.2
+
     steps:
       - name: Checkout (with submodules)
         uses: actions/checkout@v4
@@ -71,15 +75,27 @@ jobs:
           CIBW_SKIP: "musllinux_*"
           CIBW_BUILD_VERBOSITY: "1"
 
-          # ensure the arch is allowed (needed for aarch64 on x86_64 runner)
+          # Allow the selected Linux arch (needed for aarch64 on x86_64 host)
           CIBW_ARCHS_LINUX: ${{ matrix.cibw_archs_linux || '' }}
 
-          # Linux container pre-reqs (inside manylinux image) + ensure build dir exists
+          # Ensure deps + git inside manylinux, fetch CycloneDDS core into ./main, and create ./build
           CIBW_BEFORE_ALL_LINUX: |
-            (yum -y install cmake ninja-build openssl-devel || dnf -y install cmake ninja-build openssl-devel) || true
+            (yum -y install git cmake ninja-build openssl-devel || dnf -y install git cmake ninja-build openssl-devel) || true
+            if [ ! -d main ]; then
+              echo "Cloning CycloneDDS core into ./main (tag: ${CYCLONEDDS_CORE_TAG})"
+              git clone --depth 1 --branch "${CYCLONEDDS_CORE_TAG}" https://github.com/eclipse-cyclonedds/cyclonedds main
+            fi
             mkdir -p build
 
-          # Optional: speed up native cmake builds
+          # Same prep on macOS host
+          CIBW_BEFORE_ALL_MACOS: |
+            if [ ! -d main ]; then
+              echo "Cloning CycloneDDS core into ./main (tag: ${CYCLONEDDS_CORE_TAG})"
+              git clone --depth 1 --branch "${CYCLONEDDS_CORE_TAG}" https://github.com/eclipse-cyclonedds/cyclonedds main
+            fi
+            mkdir -p build
+
+          # (Optional) speed up native cmake
           CMAKE_BUILD_PARALLEL_LEVEL: "4"
         run: python -m cibuildwheel --output-dir wheelhouse
 
