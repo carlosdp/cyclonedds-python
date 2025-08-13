@@ -40,7 +40,7 @@ jobs:
 
     env:
       # Adjust if you want a different CycloneDDS core version
-      CYCLONEDDS_CORE_TAG: v0.10.2
+      CYCLONEDDS_CORE_TAG: 0.10.2
 
     steps:
       - name: Checkout
