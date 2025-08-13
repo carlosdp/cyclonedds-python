@@ -28,7 +28,7 @@ jobs:
             cibw_build: cp312-manylinux_aarch64
             cibw_archs_linux: aarch64
             qemu: true
-          # macOS
+          # macOS (per-arch runners)
           - os: macos-13
             platform: macos
             arch: x86_64
@@ -39,16 +39,26 @@ jobs:
             cibw_build: cp312-macosx_arm64
 
     env:
-      # Change if you need a different CycloneDDS core version
+      # Adjust if you want a different CycloneDDS core version
       CYCLONEDDS_CORE_TAG: v0.10.2
 
     steps:
-      - name: Checkout (with submodules)
+      - name: Checkout
         uses: actions/checkout@v4
         with:
-          submodules: recursive
+          submodules: false
 
-      - name: Enable QEMU for aarch64 (Linux)
+      # Ensure ../main exists BEFORE cibuildwheel copies the project
+      - name: Prepare CycloneDDS core (host)
+        shell: bash
+        run: |
+          set -euxo pipefail
+          if [ ! -d main ]; then
+            git clone --depth 1 --branch "${CYCLONEDDS_CORE_TAG}" https://github.com/eclipse-cyclonedds/cyclonedds main
+          fi
+          mkdir -p build
+
+      - name: Enable QEMU for aarch64 (Linux only)
         if: matrix.platform == 'linux' && matrix.arch == 'aarch64'
         uses: docker/setup-qemu-action@v3
         with:
@@ -75,27 +85,14 @@ jobs:
           CIBW_SKIP: "musllinux_*"
           CIBW_BUILD_VERBOSITY: "1"
 
-          # Allow the selected Linux arch (needed for aarch64 on x86_64 host)
+          # Allow selected Linux arch (needed for aarch64 on x86_64 host)
           CIBW_ARCHS_LINUX: ${{ matrix.cibw_archs_linux || '' }}
 
-          # Ensure deps + git inside manylinux, fetch CycloneDDS core into ./main, and create ./build
+          # Install cmake/ninja inside manylinux container
           CIBW_BEFORE_ALL_LINUX: |
-            (yum -y install git cmake ninja-build openssl-devel || dnf -y install git cmake ninja-build openssl-devel) || true
-            if [ ! -d main ]; then
-              echo "Cloning CycloneDDS core into ./main (tag: ${CYCLONEDDS_CORE_TAG})"
-              git clone --depth 1 --branch "${CYCLONEDDS_CORE_TAG}" https://github.com/eclipse-cyclonedds/cyclonedds main
-            fi
-            mkdir -p build
+            (yum -y install cmake ninja-build openssl-devel || dnf -y install cmake ninja-build openssl-devel) || true
 
-          # Same prep on macOS host
-          CIBW_BEFORE_ALL_MACOS: |
-            if [ ! -d main ]; then
-              echo "Cloning CycloneDDS core into ./main (tag: ${CYCLONEDDS_CORE_TAG})"
-              git clone --depth 1 --branch "${CYCLONEDDS_CORE_TAG}" https://github.com/eclipse-cyclonedds/cyclonedds main
-            fi
-            mkdir -p build
-
-          # (Optional) speed up native cmake
+          # Optional: speed up native cmake
           CMAKE_BUILD_PARALLEL_LEVEL: "4"
         run: python -m cibuildwheel --output-dir wheelhouse
 
@@ -111,6 +108,7 @@ jobs:
       - name: Upload wheel as its own artifact
         uses: actions/upload-artifact@v4
         with:
+          # unique & descriptive, avoids 409s on re-runs
           name: ${{ env.WHEEL_NAME }}-${{ github.run_attempt }}
           path: ${{ env.WHEEL_PATH }}
           if-no-files-found: error
