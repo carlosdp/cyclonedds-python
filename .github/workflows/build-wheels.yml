@@ -27,7 +27,7 @@ jobs:
           CIBW_BUILD: "cp312-*"
           CIBW_SKIP: "musllinux_*"   # tweak as needed
           CIBW_ARCHS_MACOS: "x86_64 arm64"
-          CIBW_ARCHS_LINUX: "x86_64 aarch64"
+          CIBW_ARCHS_LINUX: "x86_64"
         run: python -m cibuildwheel --output-dir wheelhouse
 
       - name: Upload wheels (artifact)
