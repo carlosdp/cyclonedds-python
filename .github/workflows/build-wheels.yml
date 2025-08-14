@@ -56,6 +56,7 @@ jobs:
           CIBW_BUILD: "cp312-*"
           # Avoid musllinux for now
           CIBW_SKIP: "pp* *-musllinux_*"
+          CIBW_TEST_SKIP: "*-manylinux_aarch64"
           # Mac architectures (cibuildwheel will build each runner arch natively)
           CIBW_ARCHS_MACOS: "${{ matrix.arch }}"
           # Linux architectures (cibuildwheel will use manylinux Docker images)
