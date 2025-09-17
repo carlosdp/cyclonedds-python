@@ -73,14 +73,14 @@ jobs:
             set -eux
             (yum -y install git cmake ninja-build openssl-devel || dnf -y install git cmake ninja-build openssl-devel)
             if [ ! -d main/.git ]; then
-              git clone --branch master --depth 1 https://github.com/eclipse-cyclonedds/cyclonedds.git 0.10.5
+              git clone --branch 0.10.5 --depth 1 https://github.com/eclipse-cyclonedds/cyclonedds.git main
             fi
             mkdir -p cyclonedds-build build
 
           CIBW_BEFORE_ALL_MACOS: |
             set -eux
             if [ ! -d main/.git ]; then
-              git clone --branch master --depth 1 https://github.com/eclipse-cyclonedds/cyclonedds.git 0.10.5
+              git clone --branch 0.10.5 --depth 1 https://github.com/eclipse-cyclonedds/cyclonedds.git main
             fi
             mkdir -p cyclonedds-build build
 
