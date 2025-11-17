@@ -773,12 +773,15 @@ static bool valid_py_allow_none_or_set_error(PyObject *py_obj)
     return false;
 }
 
-static bool valid_topic_py_or_set_error(PyObject *py_obj)
+static bool valid_topic_py_or_set_error(PyObject *py_obj, const char *attr_name)
 {
     if (PyErr_Occurred()) return false;
     if (py_obj != NULL && py_obj != Py_None) return true;
 
-    PyErr_SetString(PyExc_TypeError, "Invalid python object used as topic datatype.");
+    if (attr_name != NULL)
+        PyErr_Format(PyExc_TypeError, "Invalid python object used as topic datatype (attribute '%s').", attr_name);
+    else
+        PyErr_SetString(PyExc_TypeError, "Invalid python object used as topic datatype.");
     return false;
 }
 
@@ -807,16 +810,16 @@ static ddspy_sertype_t *ddspy_sertype_new(PyObject *pytype)
 
     // process
     idl = PyObject_GetAttrString(pytype, "__idl__");
-    if (!valid_topic_py_or_set_error(idl)) goto err;
+    if (!valid_topic_py_or_set_error(idl, "__idl__")) goto err;
 
     pyname = PyObject_GetAttrString(idl, "idl_transformed_typename");
-    if (!valid_topic_py_or_set_error(pyname)) goto err;
+    if (!valid_topic_py_or_set_error(pyname, "idl_transformed_typename")) goto err;
 
     pykeyless = PyObject_GetAttrString(idl, "keyless");
-    if (!valid_topic_py_or_set_error(pykeyless)) goto err;
+    if (!valid_topic_py_or_set_error(pykeyless, "keyless")) goto err;
 
     pyversion_support = PyObject_GetAttrString(idl, "version_support");
-    if (!valid_topic_py_or_set_error(pyversion_support)) goto err;
+    if (!valid_topic_py_or_set_error(pyversion_support, "version_support")) goto err;
 
 #ifdef DDS_HAS_TYPE_DISCOVERY
     xt_type_data = PyObject_GetAttrString(idl, "_xt_bytedata");
@@ -885,7 +888,8 @@ static ddspy_sertype_t *ddspy_sertype_new(PyObject *pytype)
         if (!valid_pt_or_set_error(new->v2_key_vm)) goto err;
 
         v0pykeysize = PyObject_GetAttrString(idl, "v0_key_max_size");
-        if (!valid_topic_py_or_set_error(v0pykeysize)) {
+        if (!valid_py_allow_none_or_set_error(v0pykeysize)) goto err;
+        if (v0pykeysize == Py_None) {
             // No support for v0
             if ((PyLong_AsLong(pyversion_support) & 1) > 0)
                 goto err;
@@ -899,8 +903,9 @@ static ddspy_sertype_t *ddspy_sertype_new(PyObject *pytype)
         }
 
         v2pykeysize = PyObject_GetAttrString(idl, "v2_key_max_size");
-        if (!valid_topic_py_or_set_error(v2pykeysize)) {
-            // No support for v0
+        if (!valid_py_allow_none_or_set_error(v2pykeysize)) goto err;
+        if (v2pykeysize == Py_None) {
+            // No support for v2
             if ((PyLong_AsLong(pyversion_support) & 2) > 0)
                 goto err;
             new->v2_key_vm = NULL;
@@ -936,7 +941,9 @@ static ddspy_sertype_t *ddspy_sertype_new(PyObject *pytype)
 err:
     if (new && !constructed) {
         dds_free(new);
-        PyErr_SetString(PyExc_RuntimeError, "Error in constructing DDS sertype.");
+        if (!PyErr_Occurred()) {
+            PyErr_SetString(PyExc_RuntimeError, "Error in constructing DDS sertype.");
+        }
         new = NULL;
     }
 
