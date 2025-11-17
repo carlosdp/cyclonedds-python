@@ -606,21 +606,19 @@ static void sertype_free(struct ddsi_sertype* tpcmn)
 #endif
 
     // dds_free the python type if python isn't already shutting down (deadlock).
+    int python_alive;
 #if PY_VERSION_HEX >= 0x030D0000
-    if (!Py_IsFinalizing()) {
+    python_alive = !Py_IsFinalizing();
 #elif PY_MINOR_VERSION > 6
-    if (!_Py_IsFinalizing()) {
-        PyGILState_STATE state = PyGILState_Ensure();
-        Py_DECREF(this->my_py_type);
-        PyGILState_Release(state);
-    }
+    python_alive = !_Py_IsFinalizing();
 #else
-    if (PyGILState_GetThisThreadState() != _Py_Finalizing) {
+    python_alive = (PyGILState_GetThisThreadState() != _Py_Finalizing);
+#endif
+    if (python_alive) {
         PyGILState_STATE state = PyGILState_Ensure();
         Py_DECREF(this->my_py_type);
         PyGILState_Release(state);
     }
-#endif
     ddsi_sertype_fini(tpcmn);
     dds_free(this);
 }
