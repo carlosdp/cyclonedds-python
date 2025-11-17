@@ -606,7 +606,9 @@ static void sertype_free(struct ddsi_sertype* tpcmn)
 #endif
 
     // dds_free the python type if python isn't already shutting down (deadlock).
-#if PY_MINOR_VERSION > 6
+#if PY_VERSION_HEX >= 0x030D0000
+    if (!Py_IsFinalizing()) {
+#elif PY_MINOR_VERSION > 6
     if (!_Py_IsFinalizing()) {
         PyGILState_STATE state = PyGILState_Ensure();
         Py_DECREF(this->my_py_type);
