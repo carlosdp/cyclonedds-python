@@ -17,19 +17,19 @@ jobs:
           # macOS x86_64
           - os: macos-13
             arch: x86_64
-            plat: macosx
+            cibw_build: "cp311-* cp312-* cp313-*"
           # macOS arm64
           - os: macos-14
             arch: arm64
-            plat: macosx
+            cibw_build: "cp311-* cp312-* cp313-*"
           # Linux x86_64
           - os: ubuntu-22.04
             arch: x86_64
-            plat: manylinux
+            cibw_build: "cp311-manylinux_x86_64 cp312-manylinux_x86_64 cp313-manylinux_x86_64 cp311-musllinux_x86_64 cp312-musllinux_x86_64 cp313-musllinux_x86_64"
           # Linux aarch64 (emulated via qemu)
           - os: ubuntu-22.04
             arch: aarch64
-            plat: manylinux
+            cibw_build: "cp311-manylinux_aarch64 cp312-manylinux_aarch64 cp313-manylinux_aarch64 cp311-musllinux_aarch64 cp312-musllinux_aarch64 cp313-musllinux_aarch64"
 
     steps:
       - name: Check out repository
@@ -41,7 +41,7 @@ jobs:
           python-version: "3.12"
 
       - name: Install cibuildwheel
-        run: python -m pip install --upgrade pip cibuildwheel==2.20.0
+        run: python -m pip install --upgrade pip cibuildwheel==2.23.3
 
       # Only for Linux: QEMU to build aarch64 on x86_64 host
       - name: Set up QEMU (Linux only)
@@ -50,13 +50,14 @@ jobs:
         with:
           platforms: arm64
 
-      - name: Build wheels (cp312)
+      - name: Build wheels
         env:
-          # Select only CPython 3.12 wheels
-          CIBW_BUILD: "cp312-*"
-          # Avoid musllinux for now
-          CIBW_SKIP: "pp* *-musllinux_*"
-          CIBW_TEST_SKIP: "*-manylinux_aarch64"
+          # Select CPython wheels per matrix entry (adds cp311/cp312/cp313 + musllinux on Linux)
+          CIBW_BUILD: "${{ matrix.cibw_build }}"
+          # Skip PyPy builds only
+          CIBW_SKIP: "pp*"
+          # Avoid emulated test runs which routinely time out
+          CIBW_TEST_SKIP: "*-manylinux_aarch64 *-musllinux_aarch64"
           # Mac architectures (cibuildwheel will build each runner arch natively)
           CIBW_ARCHS_MACOS: "${{ matrix.arch }}"
           # Linux architectures (cibuildwheel will use manylinux Docker images)
@@ -71,7 +72,16 @@ jobs:
           # plus we install toolchain on Linux containers. Guards avoid re-clone.
           CIBW_BEFORE_ALL_LINUX: |
             set -eux
-            (yum -y install git cmake ninja-build openssl-devel || dnf -y install git cmake ninja-build openssl-devel)
+            if command -v yum >/dev/null 2>&1; then
+              yum -y install git cmake ninja-build openssl-devel
+            elif command -v dnf >/dev/null 2>&1; then
+              dnf -y install git cmake ninja-build openssl-devel
+            elif command -v apk >/dev/null 2>&1; then
+              apk add --no-cache git cmake ninja openssl-dev build-base
+            else
+              echo "Unsupported package manager" >&2
+              exit 1
+            fi
             if [ ! -d main/.git ]; then
               git clone --branch 0.10.5 --depth 1 https://github.com/eclipse-cyclonedds/cyclonedds.git main
             fi
@@ -99,4 +109,3 @@ jobs:
           path: wheelhouse/*.whl
           if-no-files-found: error
           compression-level: 0
-
