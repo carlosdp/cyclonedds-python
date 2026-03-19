@@ -15,7 +15,7 @@ jobs:
       matrix:
         include:
           # macOS x86_64
-          - os: macos-13
+          - os: macos-15-intel
             arch: x86_64
             cibw_build: "cp310-* cp311-* cp312-* cp313-*"
           # macOS arm64
