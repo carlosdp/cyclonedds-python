@@ -17,19 +17,19 @@ jobs:
           # macOS x86_64
           - os: macos-13
             arch: x86_64
-            cibw_build: "cp311-* cp312-* cp313-*"
+            cibw_build: "cp310-* cp311-* cp312-* cp313-*"
           # macOS arm64
           - os: macos-14
             arch: arm64
-            cibw_build: "cp311-* cp312-* cp313-*"
+            cibw_build: "cp310-* cp311-* cp312-* cp313-*"
           # Linux x86_64
           - os: ubuntu-22.04
             arch: x86_64
-            cibw_build: "cp311-manylinux_x86_64 cp312-manylinux_x86_64 cp313-manylinux_x86_64 cp311-musllinux_x86_64 cp312-musllinux_x86_64 cp313-musllinux_x86_64"
+            cibw_build: "cp310-manylinux_x86_64 cp311-manylinux_x86_64 cp312-manylinux_x86_64 cp313-manylinux_x86_64 cp310-musllinux_x86_64 cp311-musllinux_x86_64 cp312-musllinux_x86_64 cp313-musllinux_x86_64"
           # Linux aarch64 (emulated via qemu)
           - os: ubuntu-22.04
             arch: aarch64
-            cibw_build: "cp311-manylinux_aarch64 cp312-manylinux_aarch64 cp313-manylinux_aarch64 cp311-musllinux_aarch64 cp312-musllinux_aarch64 cp313-musllinux_aarch64"
+            cibw_build: "cp310-manylinux_aarch64 cp311-manylinux_aarch64 cp312-manylinux_aarch64 cp313-manylinux_aarch64 cp310-musllinux_aarch64 cp311-musllinux_aarch64 cp312-musllinux_aarch64 cp313-musllinux_aarch64"
 
     steps:
       - name: Check out repository
@@ -52,7 +52,7 @@ jobs:
 
       - name: Build wheels
         env:
-          # Select CPython wheels per matrix entry (adds cp311/cp312/cp313 + musllinux on Linux)
+          # Select CPython wheels per matrix entry (adds cp310/cp311/cp312/cp313 + musllinux on Linux)
           CIBW_BUILD: "${{ matrix.cibw_build }}"
           # Skip PyPy builds only
           CIBW_SKIP: "pp*"

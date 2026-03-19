@@ -16,6 +16,9 @@ markers = ["fuzzing: run the fuzzing testsuite."]
 
 [tool.cibuildwheel]
 
+# Build CPython wheels for the supported versions.
+build = "cp310-* cp311-* cp312-* cp313-*"
+
 # Skip PyPy (C API incompatible), Skip 32bit systems, Skip universal binaries macOS (we build specific intel/arm ones)
 skip = "pp* *-win32 *_i686 *-macosx_universal2:arm64"
 
